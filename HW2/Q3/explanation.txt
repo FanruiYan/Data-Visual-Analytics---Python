@@ -1,0 +1,2 @@
+log: when variable has big difference between largest and smallest number
+sqrt: when dependent variable is porportional to independent variable, it is intuitive to use sqrt scale.
