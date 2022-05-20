@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<head>
+  <title>Games Rating: 2015 - 2019</title>
+  <meta charset="utf-8">
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+  <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+
+<style>
+.tooltip {
+fill: #2b2929;
+font-family: Georgia;
+font-size: 150%;
+}
+</style>
+</head>
+
+<body>
+
+  <script src="lib/d3-tip.min.js"></script>
+  <script src="lib/d3-dsv.min.js"></script>
+  <script src="lib/d3-legend.min.js"></script>
+  <script src="lib/d3-geo-projection.v2.min.js"></script>
+  <script src="lib/topojson.v2.min.js"></script>
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<div id="container"></div>
+
+<script>
+// ----------------------------------------------Define --------------------------------
+// --------------set up margin----------------------
+const margin = {top: 50, right: 150, bottom: 50, left: 100}
+  , width = window.innerWidth - margin.left - margin.right // Use the window's width 
+  , height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+
+const padding = 10;
+// ---------------appending SVG-------------------
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// -------------------Scaling-------------------------
+var xScale = d3.scaleLinear().range([0,width]);
+var yScale = d3.scaleLinear().rangeRound([height/2, 0]);
+
+// -----------------set up axis-----------------------
+var xaxis = d3.axisBottom().scale(xScale);
+var yaxis = d3.axisLeft().scale(yScale);
+
+// ---------------import data----------------------
+var pathToCsv = "average-rating.csv";
+d3.dsv(",", pathToCsv, function (d) {
+      return {
+		'name': d.name,
+		'year': +d.year,
+		'average_rating': Math.floor(+d.average_rating), 
+		'users_rated': +d.users_rated
+      }
+    }).then(function (data){
+      console.log(data);
+
+// -----------------Nest Data-------------------------
+var nested_data = d3.nest()
+		.key(function(d) { return d.year; })
+		.key(function(d) { return d.average_rating; })
+		.rollup(function(average_rating) { return average_rating.length})
+		.entries(data);
+console.log(nested_data);
+
+
+// ----------------axis domain-------------------------
+xScale.domain([(0), (d3.max(data, function(d) {return d.average_rating;}))]);
+yScale.domain([(0), (d3.max(nested_data.map(d => d.values).flat(), v => v.value))]);
+
+// ---------------Define Lines---------------------------
+var lines = d3.line()
+	.x(function(d) { return xScale(d.key); })
+	.y(function(d) { return yScale(d.value);})
+
+const tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0)
+    .style("position", "absolute");
+
+// ----------------------------------------------------- Drawing ----------------------------------
+// ---------------axis----------------
+var x_axis = svg.append("g")
+		.attr("class", "xaxis")
+		.attr("transform", "translate(0," + height/2 + ")")
+		.call(xaxis)
+
+	svg.append("text")
+		.text("Rating")
+		.style("font", "12px times")
+    		.attr("transform", "translate("+ (width/2) +"," + (height/2 + 20) + ") ");
+
+var y_axis = svg.append("g")
+    		.attr("class", "yaxis")
+    		.call(yaxis);
+    		
+	svg.append("text")
+    		.attr("transform", "rotate(-90)")
+    		.attr("dy", ".75em")
+    		.attr("y", -50)
+   		.attr("x",0 - (height / 4))
+    		.style("text-anchor", "end")
+    		.text("Count");
+
+//-----------------draw path & dot------------------------
+for (i = 0; i < nested_data.length; i++) {
+    if (nested_data[i].key >= 2015 && nested_data[i].key <=2019){
+	yData = nested_data[i].values
+		var list=[];
+		var thisyeardata = d3.values(yData);
+		for (j=0; j<thisyeardata.length;j++){list.push(thisyeardata[j]['key'])}
+		for (k=0; k<10; k++)
+		{if (!list.some(function(f){return f == k.toString();})){yData.push({'key':k, 'value': 0})}}
+	yData.sort(function(a, b) { return +a.key  - +b.key })
+	color = d3.schemeCategory10[i]
+
+	svg.append("path")
+		.data([yData])
+		.attr("class", "line")
+		.attr("d", lines)
+		.attr('stroke', color)
+		.style("fill", "none")
+
+
+for (h=0; h<10; h++){
+   var xc = d3.values(yData)[h]['key']
+   var yc = d3.values(yData)[h]['value']
+   var nodes = svg.append("circle")
+		.attr("cx", function(d) { return xScale(xc) })
+		.attr("cy", function(d) { return yScale(yc) })
+		.attr("r", 3)
+		.attr("year", nested_data[i].key)
+		.attr("rt", d3.values(yData)[h]['key'])
+		.style("fill", color)
+		.on('mouseover', function(d) {
+			tooltip.transition()
+			.delay(30)
+			.duration(200);
+
+			var selection1 = d3.select(this).attr("year")
+			var selection2 = d3.select(this).attr("rt")
+
+			var selection = d3.select(this).raise();
+
+			selection
+				.transition()
+				.delay("20")
+				.duration("200")
+				.attr("r", 6)
+				.attr("bar", function(d){
+var yr = selection1
+var rt = selection2
+
+filtered_data = data.filter(function(d){return d.year == yr && d.average_rating == rt;})
+		.sort(function(d){ return d3.descending(+d.users_rated) })
+		.slice(0, 5);
+
+var bxScale = d3.scaleLinear().range([0,width/2]);
+var byScale = d3.scaleBand().range([height/2+60, height]).padding(0.1);
+
+var bxaxis = d3.axisBottom().scale(bxScale).tickSize(-(height-height/2-60));
+var byaxis = d3.axisLeft().scale(byScale);
+
+bxScale.domain([(0), (d3.max(filtered_data, function(d) {return +d.users_rated;}))]);
+byScale.domain(filtered_data.map(function(d){return d.name;}));
+
+//-------------show axis----------
+var bx_axis = svg.append("g")
+		.attr("class", "bar")
+		.attr("transform", "translate(0," + height + ")")
+		.call(bxaxis)
+
+var bx_axis_text = svg.append("text")
+                .attr("class", "bar")
+		.text("Bumber of users")
+		.style("font", "12px times")
+		.attr("text-anchor", "middle")  
+    		.attr("transform", "translate("+ (width*0.25) +"," + (height + 30) + ") ");
+
+var by_axis = svg.append("g")
+    		.attr("class", "bar")
+    		.call(byaxis);
+    		
+var by_axis_text = svg.append("text")
+                .attr("class", "bar")
+    		.attr("transform", "rotate(-90)")
+    		.attr("dy", ".75em")
+    		.attr("y", -50)
+   		.attr("x",0 - (0.75*height))
+    		.style("text-anchor", "end")
+    		.text("Games");
+
+//-------------add bar plot title--------------------
+var bar_title = svg.append("text")
+                .attr("class", "bar")
+		.attr("id", "title")
+		.attr("x", (width*0.25))             
+        	.attr("y", (height/2 + 40))
+        	.attr("text-anchor", "middle")  
+        	.style("font-size", "15px") 
+		.attr("font-weight",function(d,i) {return i*300+900;})
+        	.text("Top 5 most rated games for " + yr + " with rating " +rt);
+
+//-------------draw bars----------
+
+const bars = svg.selectAll("myRect")
+            .data(filtered_data)
+	    .enter().append("rect")
+            .attr("class", "bar")
+	    .attr("x", 0)
+            .attr("width", function (d) {return bxScale(d.users_rated);})
+            .attr("y", function (d) {return byScale(d.name);})
+            .attr("height", ((height/2-80)/5))
+	    .style("fill", "purple")
+	    .style("opacity", 0.8);
+
+})
+
+;})  
+   
+
+		.on("mouseout", function(d) {      
+			tooltip.transition()        
+			.duration(100);  
+    
+			var selection = d3.select(this);
+			
+			selection
+				.transition()
+				.delay("20")
+				.duration("200")
+				.attr("r", 3)
+				.attr("bar", function(d){return svg.selectAll('rect.bar').remove() 
+							&& svg.selectAll('text.bar').remove()
+							&& svg.selectAll('g.bar').remove()})
+;});
+
+			tooltip.style("visibility", "hidden")
+
+}
+
+//-------------add legend--------------------
+	svg.append("circle")
+		.attr("cx", width-30 )
+		.attr("cy", 10+10*i)
+		.attr("r", 4)
+		.style("fill", color) 
+
+	svg.append("text")
+		.attr("text-anchor", "middle")  
+		.attr("transform", "translate(" + (width-10) + "," + (12+10*i) + ")")
+        	.style("font-size", "10px")  
+		.style("fill", "black")
+        	.text(function(d){return nested_data[i].key.toString()});
+
+ }}
+
+
+//(function bar(){
+
+
+
+
+//}
+
+
+
+
+
+//-------------add line plot title--------------------
+	svg.append("text")
+		.attr("id", "title")
+		.attr("x", (width/2))             
+        	.attr("y", -20)
+        	.attr("text-anchor", "middle")  
+        	.style("font-size", "20px") 
+		.attr("font-weight",function(d,i) {return i*300+900;})
+        	.text("Board games by Rating 2015-2019");
+
+//-------------add user name---------------------------
+	svg.append("text")
+		.attr("id", "credit")
+		.attr("text-anchor", "middle")  
+		.attr("transform", "translate("+ (width/2) +"," + (0) + ") ") 
+        	.style("font-size", "10px")  
+		.style("fill", "blue")
+        	.text("fyan40");
+
+    }).catch(function (error) {
+      console.log(error);
+    });
+</script>
+
+</body>
+
+
+
+
+
+

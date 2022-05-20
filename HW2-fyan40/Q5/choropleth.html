@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+	<!-- add title -->
+  <title>Acerage Rating of Board Games Across the World</title>
+  <meta charset="utf-8">
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+  <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+
+    <!-- import required libraries here -->
+	
+<html xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882"><head>
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Editor msdt:dt="string">Hull, Matthew D</mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Editor>
+<mso:xd_Signature msdt:dt="string"></mso:xd_Signature>
+<mso:Order msdt:dt="string">35500.0000000000</mso:Order>
+<mso:ComplianceAssetId msdt:dt="string"></mso:ComplianceAssetId>
+<mso:TemplateUrl msdt:dt="string"></mso:TemplateUrl>
+<mso:xd_ProgID msdt:dt="string"></mso:xd_ProgID>
+<mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Author msdt:dt="string">Hull, Matthew D</mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Author>
+<mso:ContentTypeId msdt:dt="string">0x010100D48F87729E805A4096AD64C4E51DACBE</mso:ContentTypeId>
+<mso:_SourceUrl msdt:dt="string"></mso:_SourceUrl>
+<mso:_SharedFileIndex msdt:dt="string"></mso:_SharedFileIndex>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+  <script src="lib/d3-tip.min.js"></script>
+  <script src="lib/d3-dsv.min.js"></script>
+  <script src="lib/d3-legend.min.js"></script>
+  <script src="lib/d3-geo-projection.v2.min.js"></script>
+  <script src="lib/topojson.v2.min.js"></script>
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<div id="container"></div>
+
+	<style>
+    /* Tooltip CSS */
+    .d3-tip {
+    line-height: 1.5;
+    font-weight: 400;
+    font-family:"avenir next", Arial, sans-serif;
+    padding: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #FFA500;
+    border-radius: 1px;
+    pointer-events: none;
+    }
+	</style>
+</head>
+
+
+
+
+
+<body>
+<!-- Add heading for the visualization -->
+<label>Average Rating of Buard Games Across the World <br></label>
+
+<!-- Create dropdown element here. Options should be added after reading in game file, they should not be created here.-->
+<label>Select Board Game: </label> <select id="Dropdown"></select>
+
+
+<!-- append visualization svg to this div-->
+    		<div id="choropleth"></div>
+
+<script>
+	
+// -----------enter code to define margin and dimensions for svg--------------
+const margin = {top: 50, right: 150, bottom: 50, left: 100}
+const width = window.innerWidth - margin.left - margin.right // Use the window's width 
+const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+
+// -----------enter code to create svg----------------------------------------------------
+const svg = d3.select("body").append("svg")
+		.attr("width", width + margin.left + margin.right)
+		.attr("height", height + margin.top + margin.bottom)
+		.append("g")
+		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// -----------enter code to create color scale---------------------------------------
+const color = d3.scaleQuantile()
+		.range(['#edf8e9', '#bae4b3', '#74c476', '#238b45']);
+
+// -----------enter code to define projection and path required for Choropleth----------------------
+var projection = d3.geoMercator().translate([width/2, height/2]).scale(100)
+//.center([0,40]);
+var path = d3.geoPath().projection(projection);
+
+
+// -----------define any other global variables---------------------------------------------- 
+const world = d3.json("world_countries.json")
+const gameData = d3.dsv(",", "ratings-by-country.csv", function(d) { return{
+			'Game': d.Game,
+			'Country': d.Country,
+			'Number_of_Users': +d['Number of Users'], 
+			'Average_Rating': +d['Average Rating'] }})
+
+//---------------import data---------------
+Promise.all([world,gameData]).then(function(values){
+	ready(values[0], values[1])
+});
+
+// -----------enter code to define tooltip-----------------------------------------------
+var tooltip = d3.tip()
+            .attr('class', 'd3-tip')
+            .offset([-10, 0])
+svg.call(tooltip);
+
+//-------------add user name---------------------------
+	svg.append("text")
+		.attr("id", "credit")
+		.attr("text-anchor", "middle")  
+		.attr("transform", "translate("+ (width) +"," + (height) + ") ") 
+        	.style("font-size", "10px")  
+		.style("fill", "blue")
+        	.text("fyan40");
+
+//-----------set up legend place------------
+svg.append("g")
+  .attr("class", "legendQuant")
+  .attr("transform", "translate("+ (width) +"," + 20 + ") ");
+
+//---------------ready function---------------
+  // this function should be called once the data from files have been read
+  // world: topojson from world_countries.json
+  // gameData: data from ratings-by-country.csv
+		
+function ready(world, gameData, error) {
+	if (error) throw error;
+     //---------enter code to extract all unique games from gameData------
+	var gamelist = d3.map(gameData, function(d){return d.Game;}).keys();
+
+     //---------enter code to append the game options to the dropdown-----
+	var GameMenu = d3.select("#Dropdown")
+			.selectAll("option")
+			.data(gamelist)
+			.enter()
+			.append("option")
+			.attr("value", function(d){return d;})
+			.text(function(d){return d;})
+
+      //---------event listener for the dropdown. Update choropleth and legend when selection changes. Call createMapAndLegend() with required arguments.
+	d3.select('#Dropdown')
+	  .on("change", function () {
+			var select = document.getElementById('Dropdown');
+			var selectedGame = select.options[select.selectedIndex].value
+			createMapAndLegend(world, gameData, selectedGame);
+			});
+
+       //--------create Choropleth with default option. Call createMapAndLegend() with required arguments. 
+	createMapAndLegend(world, gameData, "6 nimmt!")
+
+}
+
+
+// ----------updating function -------------
+  // this function should create a Choropleth and legend using the world and gameData arguments for a selectedGame
+  // also use this function to update Choropleth and legend when a different game is selected from the dropdown
+
+function createMapAndLegend(world, gameData, selectedGame){ 
+		
+var filtered_data = gameData.filter(function(d){return d.Game == selectedGame;})
+var nested_data = d3.nest()
+		.key(function(d) { return d.Game; })
+		.entries(filtered_data);
+var values = nested_data.map(d => d.values).flat()
+
+var ratingById = [];
+values.forEach(function(d, i) { ratingById.push(d)});
+world.features.forEach(function(d) { 
+	for (i=0; i<177; i++){
+		for (j=0; j<ratingById.length; j++){
+			d.Country = d.properties.name
+			d.Game = ratingById[j]['Game']
+			if ( ratingById[j]['Country'] == d.properties.name){
+				d.Average_Rating = ratingById[j]['Average_Rating']
+				d.Number_of_Users = ratingById[j]['Number_of_Users']}
+			}}
+ 	});
+
+// ----------color domain -------------
+var lower = d3.min(filtered_data, function(d){return +d.Average_Rating;})
+var upper = d3.max(filtered_data, function(d){return +d.Average_Rating;})
+color.domain([parseFloat(lower), parseFloat(upper)])
+
+	svg.append("g")
+		.attr("class", "countries")
+		.selectAll("path")
+		.data(world.features)
+		.enter().append("path")
+		.attr("d", path)
+		.style("fill", d => d.Average_Rating ? color(d.Average_Rating): "gray")
+		.style('stroke', 'white')
+		.style('stroke-width', 1.5)
+		.style("opacity",0.8)
+      	    // tooltips
+        	.style("stroke","white")
+        	.style('stroke-width', 0.3)
+		.on('mouseover',function(d){
+			tooltip.show(d);
+
+			d3.select(this)
+		  	  .style("opacity", 1)
+		  	  .style("stroke","white")
+		  	  .style("stroke-width",3);
+
+            	tooltip.html(
+		//function (c){if (c.Average_Rating == true){return 
+		function (d){
+              	return "<strong>Country: </strong><span class='details'>" + d.Country + "<br></span>" 
+		+ "<strong>Game: </strong><span class='details'>" + d.Game +"<br></span>"
+		+ "<strong>Avg Rating: </strong><span class='details'>" + d.Number_of_Users +"<br></span>"
+		+ "<strong>Number of Users: </strong><span class='details'>" + d.Average_Rating +"</span>";
+		}
+		//}}
+)
+})
+
+        	.on('mouseout', function(d){
+			tooltip.hide(d);
+
+			d3.select(this)
+		  	  .style("opacity", 0.8)
+		  	  .style("stroke","white")
+		  	  .style("stroke-width",0.3);
+		});
+
+	svg.append("path")
+		.datum(topojson.mesh(filtered_data, function(a, b) { return a !== b; }))
+		.attr("class", "names")
+		.attr("d", path);
+
+
+var legend = d3.legendColor()
+  .labelFormat(d3.format(".2f"))
+  .titleWidth(100)
+  .scale(color);
+
+svg.select(".legendQuant")
+  .call(legend);
+		
+        }
+
+
+
+    </script>
+
+</body>
+
+</html>
